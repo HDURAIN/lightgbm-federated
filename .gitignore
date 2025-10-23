@@ -1,0 +1,7 @@
+# Python 缓存
+__pycache__/
+*.pkl
+*.log
+
+# VS Code 配置
+.vscode/
