@@ -1,143 +1,137 @@
 # worker.py
 import os
-import sys
-import json
-import joblib
+import re
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from typing import Dict, Optional, List
-from contextlib import contextmanager
-from lightgbm import early_stopping, log_evaluation
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
-TRAIN_DATASETS_DIR = "./data/clients_weighted"
+DEFAULT_TRAIN_DIR = "./data/clients_weighted"
 
-def _sorted_csv_list(data_dir: str):
-    files = [f for f in os.listdir(data_dir)
-             if f.lower().endswith(".csv") and "ds_store" not in f.lower()]
-    files.sort()
-    return files
+TARGET_CLASSES = ["portmap", "syn", "mssql", "ldap", "netbios", "udp", "benign"]
+TARGET_CLASSES = [c.lower() for c in TARGET_CLASSES]
+CLS2ID = {c: i for i, c in enumerate(TARGET_CLASSES)}
 
-def get_user_data(user_idx: int):
-    fnames = _sorted_csv_list(TRAIN_DATASETS_DIR)
-    if not (0 <= user_idx < len(fnames)):
-        raise IndexError(f"user_idx {user_idx} out of range (0..{len(fnames)-1})")
-    fname = fnames[user_idx]
-    fpath = os.path.join(TRAIN_DATASETS_DIR, fname)
-    data = pd.read_csv(fpath, skipinitialspace=True, low_memory=False)
-    return data, fname
+def parse_label_7(series: pd.Series) -> np.ndarray:
+    out = []
+    for t in series:
+        key = str(t).split("_")[-1].replace("-", "").lower()
+        out.append(CLS2ID.get(key, -1))
+    return np.array(out, dtype=np.int32)
 
-@contextmanager
-def _suppress_stdout():
-    old_stdout = sys.stdout
-    try:
-        with open(os.devnull, "w") as devnull:
-            sys.stdout = devnull
-            yield
-    finally:
-        sys.stdout = old_stdout
+# 与主程序一致的列名规范化
+def _norm_col_name(c: str):
+    c = str(c).strip()
+    c = re.sub(r"\s+", " ", c)
+    if c.lower().startswith("unnamed:"):
+        return None
+    return c
 
-def coerce_numeric_with_schema(df: pd.DataFrame, feature_list: List[str], schema: Dict[str, Dict]) -> pd.DataFrame:
-    X = df.reindex(columns=feature_list, fill_value=0).copy()
-    for c in feature_list:
-        X[c] = pd.to_numeric(X[c], errors="coerce")
-        fillv = schema.get(c, {}).get("fill", 0.0)
-        dtype = schema.get(c, {}).get("dtype", "float64")
-        X[c] = X[c].replace([np.inf, -np.inf], np.nan).fillna(fillv).astype(dtype)
-    return X
+def sanitize_and_drop_columns(df: pd.DataFrame) -> pd.DataFrame:
+    orig = list(df.columns)
+    normed, keep_idx = [], []
+    for i, c in enumerate(orig):
+        nc = _norm_col_name(c)
+        if nc is None:
+            continue
+        normed.append(nc)
+        keep_idx.append(i)
+    if len(keep_idx) < len(orig):
+        df = df.iloc[:, keep_idx].copy()
+    seen, final = {}, []
+    for c in normed:
+        if c not in seen:
+            seen[c] = 1
+            final.append(c)
+        else:
+            k = seen[c]; seen[c] += 1
+            final.append(f"{c}__dup{k}")
+    df.columns = final
+    return df
 
-class Worker(object):
-    def __init__(
-        self,
-        user_idx: int,
-        feature_list: List[str],
-        schema: Dict[str, Dict],
-        class_weight: Optional[Dict[int, float]] = None,
-        target_class2id: Optional[Dict[str, int]] = None,
-    ):
+def read_csv_sanitized(path, **kwargs):
+    df = pd.read_csv(path, low_memory=False, **kwargs)
+    return sanitize_and_drop_columns(df)
+
+class Worker:
+    def __init__(self, user_idx: int, feature_list, schema,
+                 class_weight=None, target_class2id=None,
+                 csv_reader=None, train_dir=None):
         self.user_idx = user_idx
-        self.data, self.fname = get_user_data(self.user_idx)
-        self.feature_names = list(feature_list)
+        self.feature_list = feature_list
         self.schema = schema
         self.class_weight = class_weight
-        assert target_class2id is not None and len(target_class2id) >= 2, "target_class2id 不能为空"
-        self.target_class2id = target_class2id
-        self.num_classes = len(self.target_class2id)
+        self.target_class2id = target_class2id or CLS2ID
+        self.csv_reader = csv_reader or read_csv_sanitized
+        self.train_dir = train_dir or DEFAULT_TRAIN_DIR
 
+        files = [f for f in os.listdir(self.train_dir) if f.lower().endswith(".csv")]
+        files.sort()
+        self.user_file = os.path.join(self.train_dir, files[self.user_idx])
+
+        self.model = None
         self.params = {
-            "task": "train",
-            "boosting_type": "gbdt",
             "objective": "multiclass",
-            "num_class": self.num_classes,
+            "num_class": len(self.target_class2id),
             "metric": "multi_logloss",
-            "num_leaves": 40,
-            "learning_rate": 0.05,
+            "learning_rate": 0.1,
+            "num_leaves": 31,
+            "max_depth": -1,
+            "min_data_in_leaf": 20,
             "feature_fraction": 0.9,
             "bagging_fraction": 0.8,
-            "bagging_freq": 5,
-            "min_data_in_leaf": 40,
-            "lambda_l2": 0.1,
-            "verbosity": -1,
+            "bagging_freq": 1,
+            "verbose": -1,
         }
 
-        self.lgb_train, self.lgb_eval = self.preprocess_data()
+    def _load_user_data(self):
+        df = self.csv_reader(self.user_file)
+        if "Label" not in df.columns:
+            raise RuntimeError(f"{self.user_file} 缺少 Label 列")
 
-    def _parse_labels_7(self, series: pd.Series) -> np.ndarray:
-        out = []
-        for t in series:
-            key = str(t).split("_")[-1].replace("-", "").lower()
-            out.append(self.target_class2id.get(key, -1))
-        return np.array(out, dtype=np.int32).ravel()
+        keep = [c for c in self.feature_list if c in df.columns]
+        X = df[keep].copy()
+        y = parse_label_7(df["Label"])
+        mask = (y >= 0)
+        X = X.loc[mask].reset_index(drop=True)
+        y = y[mask]
 
-    def preprocess_data(self):
-        label_series = (self.data["Label"] if "Label" in self.data.columns else self.data.iloc[:, -1])
-        y_all = self._parse_labels_7(label_series)
-        mask = (y_all >= 0)
-        if not np.any(mask):
-            raise ValueError(f"[Worker {self.user_idx}] 本客户端在 7 类下没有样本，请检查数据划分。")
-        y = y_all[mask]
-        X_all = coerce_numeric_with_schema(self.data, self.feature_names, self.schema)
-        X = X_all.loc[mask].reset_index(drop=True)
-        self.train_x, self.val_x, self.train_y, self.val_y = train_test_split(
-            X.values, y, test_size=0.2, random_state=42, stratify=y
+        for c in keep:
+            X[c] = X[c].astype(self.schema.get(c, {}).get("dtype", "float64"))
+            X[c] = X[c].fillna(self.schema.get(c, {}).get("fill", 0.0))
+
+        X_tr, X_va, y_tr, y_va = train_test_split(
+            X.values, y, test_size=0.2, random_state=2024, stratify=y
         )
-        if self.class_weight is None:
-            w_train = None
-            w_val = None
-        else:
-            w_train = np.array([self.class_weight[int(c)] for c in self.train_y], dtype=np.float64)
-            w_val   = np.array([self.class_weight[int(c)] for c in self.val_y],   dtype=np.float64)
-        lgb_train = lgb.Dataset(self.train_x, self.train_y, weight=w_train)
-        lgb_eval  = lgb.Dataset(self.val_x,   self.val_y,   reference=lgb_train, weight=w_val)
-        return lgb_train, lgb_eval
+        return X_tr, X_va, y_tr, y_va, keep
 
-    def user_round_train_eval(self) -> float:
-        with _suppress_stdout():
-            self.model = lgb.train(
-                params=self.params,
-                train_set=self.lgb_train,
-                num_boost_round=300,
-                valid_sets=[self.lgb_eval],
-                valid_names=["valid_0"],
-                callbacks=[
-                    early_stopping(stopping_rounds=30, verbose=False),
-                    log_evaluation(period=0),
-                ],
-            )
-        preds = self.model.predict(self.val_x, num_iteration=self.model.best_iteration)
-        y_pred = np.argmax(preds, axis=1)
-        acc = accuracy_score(self.val_y, y_pred)
-        return float(acc)
+    def user_round_train_eval(self):
+        X_tr, X_va, y_tr, y_va, cols = self._load_user_data()
+        dtr = lgb.Dataset(X_tr, label=y_tr, feature_name=cols, free_raw_data=False)
+        dva = lgb.Dataset(X_va, label=y_va, feature_name=cols, free_raw_data=False)
+        self.model = lgb.train(
+            params=self.params,
+            train_set=dtr,
+            valid_sets=[dva],
+            num_boost_round=200,
+            callbacks=[lgb.early_stopping(stopping_rounds=5, verbose=False)],
+        )
+        yhat = np.argmax(self.model.predict(X_va, num_iteration=self.model.best_iteration), axis=1)
+        return float((yhat == y_va).mean())
 
-    def save_model(self):
-        joblib.dump(self.model, f"model_user_{self.user_idx:03d}.pkl")
+    def predict_raw_df(self, df_in: pd.DataFrame):
+        df = df_in.copy()
+        if "Label" in df.columns:
+            df = df.drop(columns=["Label"])
+        df = sanitize_and_drop_columns(df)
 
-    def predict_probs_df(self, test_df: pd.DataFrame) -> np.ndarray:
-        X = coerce_numeric_with_schema(test_df, self.feature_names, self.schema)
+        X = pd.DataFrame()
+        for c in self.feature_list:
+            if c in df.columns:
+                X[c] = df[c].astype(self.schema.get(c, {}).get("dtype", "float64")).fillna(
+                    self.schema.get(c, {}).get("fill", 0.0)
+                )
+            else:
+                X[c] = self.schema.get(c, {}).get("fill", 0.0)
+        # 返回 raw logits（未 softmax）
         return self.model.predict(X.values, num_iteration=self.model.best_iteration)
-
-    def predict_raw_df(self, test_df: pd.DataFrame) -> np.ndarray:
-        X = coerce_numeric_with_schema(test_df, self.feature_names, self.schema)
-        return self.model.predict(X.values, num_iteration=self.model.best_iteration, raw_score=True)
