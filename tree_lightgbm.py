@@ -1,4 +1,6 @@
 # tree_lightgbm.py
+
+# -*- coding: utf-8 -*-
 import os
 import json
 import argparse
