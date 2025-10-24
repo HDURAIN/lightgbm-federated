@@ -1,0 +1,70 @@
+{
+  "Active Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Avg Bulk Rate": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd IAT Total": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Packet Length Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "FIN Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Flow Bytes/s": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Flow Duration": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Avg Bytes/Bulk": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd IAT Total": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd PSH Flags": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Packets/s": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Idle Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Init_Win_bytes_forward": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Protocol": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Subflow Fwd Packets": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Total Length of Fwd Packets": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Unnamed: 0": {
+    "dtype": "float64",
+    "fill": 0.0
+  }
+}

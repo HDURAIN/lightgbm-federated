@@ -1,0 +1,17 @@
+Active Mean
+Bwd Avg Bulk Rate
+Bwd IAT Total
+Bwd Packet Length Max
+FIN Flag Count
+Flow Bytes/s
+Flow Duration
+Fwd Avg Bytes/Bulk
+Fwd IAT Total
+Fwd PSH Flags
+Fwd Packets/s
+Idle Mean
+Init_Win_bytes_forward
+Protocol
+Subflow Fwd Packets
+Total Length of Fwd Packets
+Unnamed: 0
