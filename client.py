@@ -1,8 +1,8 @@
-# worker.py
+# -*- coding: utf-8 -*-
+# client.py —— 客户端：本地训练与预测（LightGBM）
+
 import os
 import sys
-import json
-import joblib
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -12,6 +12,7 @@ from lightgbm import early_stopping, log_evaluation
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
+# 客户端数据目录（与服务器端保持一致）
 TRAIN_DATASETS_DIR = "./data/clients_weighted"
 
 def _sorted_csv_list(data_dir: str):
@@ -27,6 +28,8 @@ def get_user_data(user_idx: int):
     fname = fnames[user_idx]
     fpath = os.path.join(TRAIN_DATASETS_DIR, fname)
     data = pd.read_csv(fpath, skipinitialspace=True, low_memory=False)
+    # 统一清理列名两侧空格
+    data.columns = [c.strip() for c in data.columns]
     return data, fname
 
 @contextmanager
@@ -48,21 +51,28 @@ def coerce_numeric_with_schema(df: pd.DataFrame, feature_list: List[str], schema
         X[c] = X[c].replace([np.inf, -np.inf], np.nan).fillna(fillv).astype(dtype)
     return X
 
-class Worker(object):
+class ClientWorker(object):
+    """
+    单客户端训练器：
+    - 从本端CSV读取数据
+    - 预处理（与服务器共享的FEATURE_LIST/SCHEMA对齐）
+    - 本地训练 LightGBM
+    - 暴露：验证准确率、对测试集的 raw_score/logits 预测
+    """
     def __init__(
         self,
         user_idx: int,
         feature_list: List[str],
         schema: Dict[str, Dict],
-        class_weight: Optional[Dict[int, float]] = None,
-        target_class2id: Optional[Dict[str, int]] = None,
+        class_weight: Optional[Dict[int, float]],
+        target_class2id: Dict[str, int],
     ):
         self.user_idx = user_idx
         self.data, self.fname = get_user_data(self.user_idx)
         self.feature_names = list(feature_list)
         self.schema = schema
         self.class_weight = class_weight
-        assert target_class2id is not None and len(target_class2id) >= 2, "target_class2id 不能为空"
+        assert target_class2id and len(target_class2id) >= 2, "target_class2id 不能为空"
         self.target_class2id = target_class2id
         self.num_classes = len(self.target_class2id)
 
@@ -82,21 +92,22 @@ class Worker(object):
             "verbosity": -1,
         }
 
-        self.lgb_train, self.lgb_eval = self.preprocess_data()
+        self.lgb_train, self.lgb_eval = self._preprocess_data()
 
     def _parse_labels_7(self, series: pd.Series) -> np.ndarray:
         out = []
         for t in series:
-            key = str(t).split("_")[-1].replace("-", "").lower()
+            # 更稳健：去空格、保留下划线后缀、去掉连接符与内部空格
+            key = str(t).strip().split("_")[-1].replace("-", "").replace(" ", "").lower()
             out.append(self.target_class2id.get(key, -1))
         return np.array(out, dtype=np.int32).ravel()
 
-    def preprocess_data(self):
+    def _preprocess_data(self):
         label_series = (self.data["Label"] if "Label" in self.data.columns else self.data.iloc[:, -1])
         y_all = self._parse_labels_7(label_series)
         mask = (y_all >= 0)
         if not np.any(mask):
-            raise ValueError(f"[Worker {self.user_idx}] 本客户端在 7 类下没有样本，请检查数据划分。")
+            raise ValueError(f"[Client {self.user_idx}] 本客户端在 7 类下没有样本，请检查数据划分/标签。")
         y = y_all[mask]
         X_all = coerce_numeric_with_schema(self.data, self.feature_names, self.schema)
         X = X_all.loc[mask].reset_index(drop=True)
@@ -113,7 +124,7 @@ class Worker(object):
         lgb_eval  = lgb.Dataset(self.val_x,   self.val_y,   reference=lgb_train, weight=w_val)
         return lgb_train, lgb_eval
 
-    def user_round_train_eval(self) -> float:
+    def train_and_eval(self) -> float:
         with _suppress_stdout():
             self.model = lgb.train(
                 params=self.params,
@@ -131,13 +142,7 @@ class Worker(object):
         acc = accuracy_score(self.val_y, y_pred)
         return float(acc)
 
-    def save_model(self):
-        joblib.dump(self.model, f"model_user_{self.user_idx:03d}.pkl")
-
-    def predict_probs_df(self, test_df: pd.DataFrame) -> np.ndarray:
-        X = coerce_numeric_with_schema(test_df, self.feature_names, self.schema)
-        return self.model.predict(X.values, num_iteration=self.model.best_iteration)
-
+    # 服务器在聚合阶段调用：
     def predict_raw_df(self, test_df: pd.DataFrame) -> np.ndarray:
         X = coerce_numeric_with_schema(test_df, self.feature_names, self.schema)
         return self.model.predict(X.values, num_iteration=self.model.best_iteration, raw_score=True)

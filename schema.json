@@ -1,5 +1,33 @@
 {
+  "ACK Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Active Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Active Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Active Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Active Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Average Packet Size": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Avg Bwd Segment Size": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Avg Fwd Segment Size": {
     "dtype": "float64",
     "fill": 0.0
   },
@@ -7,11 +35,79 @@
     "dtype": "float64",
     "fill": 0.0
   },
+  "Bwd Avg Bytes/Bulk": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Avg Packets/Bulk": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Header Length": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd IAT Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd IAT Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd IAT Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd IAT Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Bwd IAT Total": {
     "dtype": "float64",
     "fill": 0.0
   },
+  "Bwd PSH Flags": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Bwd Packet Length Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Packet Length Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Packet Length Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Packet Length Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd Packets/s": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Bwd URG Flags": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "CWE Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Destination Port": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Down/Up Ratio": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "ECE Flag Count": {
     "dtype": "float64",
     "fill": 0.0
   },
@@ -27,7 +123,59 @@
     "dtype": "float64",
     "fill": 0.0
   },
+  "Flow IAT Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Flow IAT Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Flow IAT Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Flow IAT Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Flow Packets/s": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Avg Bulk Rate": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Fwd Avg Bytes/Bulk": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Avg Packets/Bulk": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Header Length": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Header Length.1": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd IAT Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd IAT Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd IAT Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd IAT Std": {
     "dtype": "float64",
     "fill": 0.0
   },
@@ -39,7 +187,31 @@
     "dtype": "float64",
     "fill": 0.0
   },
+  "Fwd Packet Length Max": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Packet Length Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Packet Length Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd Packet Length Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Fwd Packets/s": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Fwd URG Flags": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Idle Max": {
     "dtype": "float64",
     "fill": 0.0
   },
@@ -47,7 +219,47 @@
     "dtype": "float64",
     "fill": 0.0
   },
+  "Idle Min": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Idle Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Inbound": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Init_Win_bytes_backward": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Init_Win_bytes_forward": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Max Packet Length": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Min Packet Length": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "PSH Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Packet Length Mean": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Packet Length Std": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Packet Length Variance": {
     "dtype": "float64",
     "fill": 0.0
   },
@@ -55,7 +267,47 @@
     "dtype": "float64",
     "fill": 0.0
   },
+  "RST Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "SYN Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "SimillarHTTP": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Source Port": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Subflow Bwd Bytes": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Subflow Bwd Packets": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Subflow Fwd Bytes": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
   "Subflow Fwd Packets": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Total Backward Packets": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Total Fwd Packets": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "Total Length of Bwd Packets": {
     "dtype": "float64",
     "fill": 0.0
   },
@@ -63,7 +315,15 @@
     "dtype": "float64",
     "fill": 0.0
   },
-  "Unnamed: 0": {
+  "URG Flag Count": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "act_data_pkt_fwd": {
+    "dtype": "float64",
+    "fill": 0.0
+  },
+  "min_seg_size_forward": {
     "dtype": "float64",
     "fill": 0.0
   }
