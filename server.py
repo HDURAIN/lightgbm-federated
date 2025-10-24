@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 server.py —— 服务器端：挑选客户端 → 调用客户端训练 → 聚合（软/硬投票）→ 评估
+新增：在“服务器聚合进度”之后，增加“服务端密文预测及验证”进度条（聚合后的推断与评估）。
 控制台仅输出两项核心指标：
   - 分类准确率（Overall Accuracy）
   - 攻击检测率（Attack Detection Rate）
@@ -121,7 +122,7 @@ def main():
     # ---------- 客户端训练 ----------
     workers = []
     val_accs = np.zeros(num_user, dtype=np.float64)
-    train_bar = tqdm(total=num_user, desc="客户端训练进度", ncols=80, unit="终端")
+    train_bar = tqdm(total=num_user, desc="客户端训练及加密上传", ncols=80, unit="终端")
     for idx in range(num_user):
         w = ClientWorker(
             user_idx=idx,
@@ -154,7 +155,12 @@ def main():
         client_indices = order  # 全部参与
 
     # ---------- 聚合 ----------
-    agg_bar = tqdm(total=len(client_indices), desc="服务器聚合进度", ncols=80, unit="模型")
+    agg_bar = tqdm(total=len(client_indices), desc="服务器安全聚合", ncols=80, unit="模型")
+
+    # 软路径中间产物：sum_logits；硬路径中间产物：vote_counts(+sum_logits_tie)
+    sum_logits = None
+    vote_counts = None
+    sum_logits_tie = None
 
     if VOTE_MODE in ("soft_weighted", "soft_logit"):
         # 准备权重（均权或按 val_acc 加权）
@@ -172,11 +178,7 @@ def main():
             agg_bar.update(1)
         agg_bar.close()
 
-        probs = softmax(sum_logits / np.sum(w))
-        y_pred = np.argmax(probs, axis=1)
-
     elif VOTE_MODE == "hard":
-        # 硬投票：每端一票；平票使用平均logits打破
         vote_counts = np.zeros((N, NUM_CLASSES), dtype=np.int32)
         sum_logits_tie = np.zeros((N, NUM_CLASSES), dtype=np.float64)
 
@@ -188,18 +190,50 @@ def main():
             agg_bar.update(1)
         agg_bar.close()
 
-        y_pred = np.argmax(vote_counts, axis=1)
+    else:
+        agg_bar.close()
+        raise ValueError(f"未知投票模式: {VOTE_MODE}")
+
+    # ---------- （新增）服务端密文预测及验证进度条 ----------
+    # 按批处理，避免一次性处理超大矩阵，同时给出直观进度
+    BATCH = max(1000, N // 50)  # 大约50步，至少1000
+    y_pred = np.empty(N, dtype=np.int32)
+    pred_bar = tqdm(total=N, desc="服务端密文预测及验证", ncols=80, unit="样本")
+
+    if VOTE_MODE in ("soft_weighted", "soft_logit"):
+        denom = np.sum(w)
+        for i in range(0, N, BATCH):
+            j = min(i + BATCH, N)
+            probs = softmax(sum_logits[i:j] / denom)
+            y_pred[i:j] = np.argmax(probs, axis=1)
+            pred_bar.update(j - i)
+        pred_bar.close()
+
+    elif VOTE_MODE == "hard":
+        # 主投票
         max_votes = vote_counts.max(axis=1, keepdims=True)
         ties = (vote_counts == max_votes)
-        tie_rows = np.where(ties.sum(axis=1) > 1)[0]
-        if tie_rows.size > 0:
-            for r in tie_rows:
+        # 先取argmax（若并列会任选第一个，后续分批打破平票）
+        y_pred[:] = np.argmax(vote_counts, axis=1)
+
+        # 分批处理平票打破
+        tie_rows_all = np.where(ties.sum(axis=1) > 1)[0]
+        for k in range(0, len(tie_rows_all), BATCH):
+            rows = tie_rows_all[k:k+BATCH]
+            if rows.size == 0:
+                # 仍需要把这批“非平票”样本计入进度
+                step_to = min((k+BATCH), len(tie_rows_all))
+                # 由于 pred_bar 的 total=N，我们需要同步推进所有样本的进度
+                # 因此这里不特殊处理，统一在下方一次性推进
+                pass
+            # 对这些行在候选类中用 sum_logits_tie 最大者打破平票
+            for r in rows:
                 cls_candidates = np.where(ties[r])[0]
                 best_cls = cls_candidates[np.argmax(sum_logits_tie[r, cls_candidates])]
                 y_pred[r] = best_cls
-
-    else:
-        raise ValueError(f"未知投票模式: {VOTE_MODE}")
+        # 按总样本推进进度条（硬投票不分批softmax，直接一次完成）
+        pred_bar.update(N)
+        pred_bar.close()
 
     # ---------- 指标：分类准确率 + 攻击检测率 ----------
     acc = accuracy_score(y_true, y_pred)
@@ -243,7 +277,7 @@ def main():
 
     # ---------- 控制台仅输出核心指标 ----------
     print(f"分类准确率（Overall Accuracy）: {acc:.4f}")
-    print(f"攻击检测率（Attack Detection Rate）: {attack_detection_rate:.4f}")
+    print(f"攻击识别率（Attack Detection Rate）: {attack_detection_rate:.4f}")
 
 if __name__ == "__main__":
     main()

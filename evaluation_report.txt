@@ -1,0 +1,31 @@
+=== Overall Summary ===
+Vote Mode               : soft_weighted
+Clients (used/total)    : 480/600
+Overall Accuracy        : 0.9786
+Attack Detection Rate   : 0.9876
+
+=== Per-class Report (Precision / Recall / F1 / Support) ===
+              precision    recall  f1-score   support
+
+     portmap     0.0000    0.0000    0.0000         4
+         syn     0.9375    0.9783    0.9574        46
+       mssql     1.0000    1.0000    1.0000        40
+        ldap     1.0000    1.0000    1.0000        42
+     netbios     1.0000    1.0000    1.0000        77
+         udp     1.0000    1.0000    1.0000        32
+      benign     0.9268    0.9744    0.9500        39
+
+    accuracy                         0.9786       280
+   macro avg     0.8378    0.8504    0.8439       280
+weighted avg     0.9653    0.9786    0.9718       280
+
+
+=== Explanation ===
+评估指标解释：
+1) 分类准确率（Overall Accuracy）:
+   - 定义：所有样本中预测正确的比例。
+   - 作用：衡量模型整体在7类上的识别准确性。
+2) 攻击检测率（Attack Detection Rate）:
+   - 定义：所有攻击样本中被正确识别为攻击的比例。
+     Attack Detection Rate = 被正确识别为攻击的攻击样本数 / 攻击样本总数。
+   - 作用：衡量系统发现攻击的能力，越高越好（1.0 表示无漏检）。
